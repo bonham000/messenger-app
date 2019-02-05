@@ -1,41 +1,80 @@
-import * as React from "react";
+import React from "react";
+
 import { StyleSheet, Text, View } from "react-native";
 
-export default class App extends React.Component {
+const local = "ws://localhost:3012";
+const dev = "http://localhost:8000/";
+const URL = "https://shrouded-coast-91311.herokuapp.com";
+
+const BACKED_URI = URL;
+
+interface Message {
+  id: number;
+  uuid: string;
+  message: string;
+  author: string;
+}
+
+interface IState {
+  messages: ReadonlyArray<Message>;
+}
+
+export default class App extends React.Component<{}, IState> {
+  socket: any;
+
+  constructor(props: {}) {
+    super(props);
+
+    this.state = {
+      messages: [],
+    };
+  }
+
   async componentDidMount() {
-    await this.getMessages();
-    const message = await this.postMessage();
-    await this.editMessage({
-      ...message,
-      message: "Hello, I'm Ryan!!!",
+    // @ts-ignore
+    this.socket = new WebSocket(`ws://shrouded-coast-91311.herokuapp.com:3012`);
+
+    // Open connection
+    this.socket.addEventListener(
+      "open",
+      (_: any) => {
+        console.log("Socket listener opened");
+      },
+      (error: any) => {
+        console.log(`Error opening WebSockets listener: ${error}`);
+      },
+    );
+
+    // Listen for messages
+    this.socket.addEventListener("message", (event: any) => {
+      this.handleSocketMessage(event);
     });
-    await this.getMessages();
-    await this.deleteMessage(message.id);
-    await this.getMessages();
+
+    this.getMessages();
   }
   render() {
     return (
       <View style={styles.container}>
-        <Text>Open up App.js to start working on your app!</Text>
+        <Text>Message History:</Text>
       </View>
     );
   }
 
+  handleSocketMessage = (message: any) => {
+    console.log(`Socket data received: ${message}`);
+  };
+
   getMessages = async () => {
     try {
-      console.log("\n");
-      console.log("Getting messages...");
-      const result = await fetch("http://localhost:8000/messages", {
+      const result = await fetch(`${BACKED_URI}/messages`, {
         method: "GET",
       });
       const response = await result.json();
-      console.log(response);
-      console.log(
-        `Message history result received! ${response.length} total messages!`,
-      );
+      this.setState({
+        messages: response,
+      });
     } catch (err) {
-      console.log("Message get error:");
-      console.log(err);
+      this.handleError("GET", err);
     }
   };
 
@@ -46,9 +85,7 @@ export default class App extends React.Component {
         author: "Seanie X",
       };
 
-      console.log("\n");
-      console.log("Posting message...");
-      const result = await fetch("http://localhost:8000/message", {
+      const result = await fetch(`${BACKED_URI}/message`, {
         method: "POST",
         headers: {
           Accept: "application/json",
@@ -57,20 +94,15 @@ export default class App extends React.Component {
         body: JSON.stringify(data),
       });
       const response = await result.json();
-      console.log("Message post result:");
-      console.log(response);
       return response;
     } catch (err) {
-      console.log("Message post error:");
-      console.log(err);
+      this.handleError("POST", err);
     }
   };
 
   editMessage = async (message: any) => {
     try {
-      console.log("\n");
-      console.log("Editing message...");
-      const result = await fetch("http://localhost:8000/message", {
+      const result = await fetch(`${BACKED_URI}/message`, {
         method: "PUT",
         headers: {
           Accept: "application/json",
@@ -79,28 +111,24 @@ export default class App extends React.Component {
         body: JSON.stringify(message),
       });
       const response = await result.json();
-      console.log("Message edit result:");
-      console.log(response);
     } catch (err) {
-      console.log("Message edit error:");
-      console.log(err);
+      this.handleError("PUT", err);
     }
   };
 
   deleteMessage = async (id: number) => {
     try {
-      console.log("\n");
-      console.log("Deleting message...");
-      const result = await fetch(`http://localhost:8000/message/${id}`, {
+      const result = await fetch(`${BACKED_URI}/message/${id}`, {
         method: "DELETE",
       });
       const response = await result.json();
-      console.log("Message delete result:");
-      console.log(response);
     } catch (err) {
-      console.log("Message delete error:");
-      console.log(err);
+      this.handleError("DELETE", err);
     }
+  };
+
+  handleError = (method: "GET" | "PUT" | "POST" | "DELETE", err: any) => {
+    console.log(`Error for ${method} method: `, err);
   };
 }
 

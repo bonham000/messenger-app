@@ -1,12 +1,26 @@
 import React from "react";
 
-import { StyleSheet, Text, View } from "react-native";
+import {
+  Button,
+  FlatList,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 
-const local = "ws://localhost:3012";
-const dev = "http://localhost:8000/";
-const URL = "https://shrouded-coast-91311.herokuapp.com";
+const DEV_WEBSOCKET_URI = "ws://localhost:3012";
+const PROD_WEBSOCKET_URI = "ws://shrouded-coast-91311.herokuapp.com:3012";
+const DEV_URL = "http://localhost:8000/";
+const PROD_URL = "https://shrouded-coast-91311.herokuapp.com";
 
-const BACKED_URI = URL;
+// Un-comment for local development
+const BACKED_URI = DEV_URL;
+const WEBSOCKET_URI = DEV_WEBSOCKET_URI;
+
+// Un-comment to enable Production backend
+// const BACKED_URI = PROD_URL;
+// const WEBSOCKET_URI = PROD_WEBSOCKET_URI;
 
 interface Message {
   id: number;
@@ -16,6 +30,7 @@ interface Message {
 }
 
 interface IState {
+  input: string;
   messages: ReadonlyArray<Message>;
 }
 
@@ -26,13 +41,14 @@ export default class App extends React.Component<{}, IState> {
     super(props);
 
     this.state = {
+      input: "",
       messages: [],
     };
   }
 
   async componentDidMount() {
     // @ts-ignore
-    this.socket = new WebSocket(`ws://shrouded-coast-91311.herokuapp.com:3012`);
+    this.socket = new WebSocket(WEBSOCKET_URI);
 
     // Open connection
     this.socket.addEventListener(
@@ -47,21 +63,46 @@ export default class App extends React.Component<{}, IState> {
 
     // Listen for messages
     this.socket.addEventListener("message", (event: any) => {
-      this.handleSocketMessage(event);
+      this.handleSocketMessage(event.data);
     });
 
     this.getMessages();
   }
+
   render() {
     return (
       <View style={styles.container}>
-        <Text>Message History:</Text>
+        <Text style={{ margin: 20, fontSize: 18, fontWeight: "bold" }}>
+          Message History:
+        </Text>
+        <FlatList
+          data={this.state.messages.map(m => ({ message: m, key: m.uuid }))}
+          renderItem={({ item }) => (
+            <Text style={{ margin: 6 }} key={item.key}>
+              {item.message.message}
+            </Text>
+          )}
+        />
+        <TextInput
+          style={styles.textInput}
+          placeholder="Type a new message"
+          value={this.state.input}
+          onChangeText={(text: string) => this.setState({ input: text })}
+        />
+        <Button onPress={this.postMessage} title="Send Message" />
       </View>
     );
   }
 
-  handleSocketMessage = (message: any) => {
-    console.log(`Socket data received: ${message}`);
+  handleSocketMessage = (data: any) => {
+    console.log(`Socket data received: ${JSON.stringify(data)}`);
+    /**
+     * TODO: Add message locally, if it doesn't already exist
+     */
+  };
+
+  broadcastMessage = (message: Message) => {
+    this.socket.send(JSON.stringify(message));
   };
 
   getMessages = async () => {
@@ -80,8 +121,8 @@ export default class App extends React.Component<{}, IState> {
 
   postMessage = async () => {
     try {
-      const data = {
-        message: `Hello from Earth -> ${Date.now()}`,
+      const message = {
+        message: this.state.input,
         author: "Seanie X",
       };
 
@@ -91,10 +132,18 @@ export default class App extends React.Component<{}, IState> {
           Accept: "application/json",
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(message),
       });
-      const response = await result.json();
-      return response;
+      const newMessage = await result.json();
+      this.setState(
+        prevState => ({
+          input: "",
+          messages: prevState.messages.concat(newMessage),
+        }),
+        () => {
+          this.broadcastMessage(newMessage);
+        },
+      );
     } catch (err) {
       this.handleError("POST", err);
     }
@@ -111,6 +160,9 @@ export default class App extends React.Component<{}, IState> {
         body: JSON.stringify(message),
       });
       const response = await result.json();
+      /**
+       * TODO: Update local state with result
+       */
     } catch (err) {
       this.handleError("PUT", err);
     }
@@ -122,6 +174,9 @@ export default class App extends React.Component<{}, IState> {
         method: "DELETE",
       });
       const response = await result.json();
+      /**
+       * TODO: Remove message from local chat history
+       */
     } catch (err) {
       this.handleError("DELETE", err);
     }
@@ -135,8 +190,19 @@ export default class App extends React.Component<{}, IState> {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    paddingTop: 75,
+    paddingBottom: 45,
     backgroundColor: "#fff",
     alignItems: "center",
     justifyContent: "center",
+  },
+  textInput: {
+    margin: 12,
+    padding: 12,
+    height: 40,
+    width: "90%",
+    borderWidth: 1,
+    fontSize: 14,
+    borderColor: "rgba(50,50,50,0.5)",
   },
 });

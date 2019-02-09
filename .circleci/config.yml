@@ -86,6 +86,6 @@ workflows:
           filters:
             branches:
               only: master
-      - publish
+      - publish:
           requires:
             - test

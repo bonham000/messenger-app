@@ -20,8 +20,9 @@ const PROD_WEBSOCKET_URI = "ws://shrouded-coast-91311.herokuapp.com:3012";
 const DEV_URL = "http://192.168.1.129:8000/";
 const PROD_URL = "https://shrouded-coast-91311.herokuapp.com";
 
-// @ts-ignore
-const BACKED_URI = process.env.NODE_ENV === "development" ? DEV_URL : PROD_URL;
+const BACKEND_URI =
+  // @ts-ignore
+  process.env.NODE_ENV === "development" ? DEV_URL : PROD_URL;
 const WEBSOCKET_URI =
   // @ts-ignore
   process.env.NODE_ENV === "development"
@@ -84,28 +85,10 @@ export default class App extends React.Component<{}, IState> {
   }
 
   async componentDidMount() {
-    // @ts-ignore
-    this.socket = new WebSocket(WEBSOCKET_URI);
-
     /**
-     * Open Socket connection
+     * Initialize web socket connection
      */
-    this.socket.addEventListener(
-      "open",
-      (_: any) => {
-        console.log("Socket listener opened");
-      },
-      (error: any) => {
-        console.log(`Error opening WebSockets listener: ${error}`);
-      },
-    );
-
-    /**
-     * Listen for messages
-     */
-    this.socket.addEventListener("message", (event: any) => {
-      this.handleSocketMessage(event.data);
-    });
+    this.initializeWebSocketConnection();
 
     /**
      * Fetch existing messages
@@ -185,7 +168,11 @@ export default class App extends React.Component<{}, IState> {
       message_type: type,
     });
     console.log("Broadcasting message over WebSockets... ", data);
-    this.socket.send(data);
+    try {
+      this.socket.send(data);
+    } catch (err) {
+      console.log("Could not send websockets message!");
+    }
   };
 
   handleSaveMessageUpdate = (message: Message) => {
@@ -202,7 +189,7 @@ export default class App extends React.Component<{}, IState> {
 
   getMessages = async () => {
     try {
-      const result = await fetch(`${BACKED_URI}/messages`, HTTP.GET);
+      const result = await fetch(`${BACKEND_URI}/messages`, HTTP.GET);
       const response = await result.json();
       this.setState({
         messages: response,
@@ -218,7 +205,7 @@ export default class App extends React.Component<{}, IState> {
         message: this.state.input,
         author: "Seanie X",
       };
-      const result = await fetch(`${BACKED_URI}/message`, {
+      const result = await fetch(`${BACKEND_URI}/message`, {
         ...HTTP.POST,
         headers: {
           Accept: "application/json",
@@ -242,7 +229,7 @@ export default class App extends React.Component<{}, IState> {
         message: this.state.input,
         author: "Seanie X",
       };
-      const result = await fetch(`${BACKED_URI}/message`, {
+      const result = await fetch(`${BACKEND_URI}/message`, {
         ...HTTP.PUT,
         headers: {
           Accept: "application/json",
@@ -261,7 +248,7 @@ export default class App extends React.Component<{}, IState> {
 
   deleteMessage = async (message: Message) => {
     try {
-      await fetch(`${BACKED_URI}/message/${message.id}`, HTTP.DELETE);
+      await fetch(`${BACKEND_URI}/message/${message.id}`, HTTP.DELETE);
       this.setState(handleDeleteMessage(message.id), () => {
         this.broadcastMessage(MessageBroadcastType.DELETE, message);
       });
@@ -301,6 +288,35 @@ export default class App extends React.Component<{}, IState> {
       ],
       { cancelable: false },
     );
+  };
+
+  initializeWebSocketConnection = () => {
+    try {
+      // @ts-ignore
+      this.socket = new WebSocket(WEBSOCKET_URI);
+
+      /**
+       * Open Socket connection
+       */
+      this.socket.addEventListener(
+        "open",
+        (_: any) => {
+          console.log("Socket listener opened");
+        },
+        (error: any) => {
+          console.log(`Error opening WebSockets listener: ${error}`);
+        },
+      );
+
+      /**
+       * Listen for messages
+       */
+      this.socket.addEventListener("message", (event: any) => {
+        this.handleSocketMessage(event.data);
+      });
+    } catch (err) {
+      console.log("Error initializing web socket connection", err);
+    }
   };
 }
 

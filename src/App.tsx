@@ -20,13 +20,13 @@ const PROD_WEBSOCKET_URI = "ws://shrouded-coast-91311.herokuapp.com:3012";
 const DEV_URL = "http://192.168.1.129:8000/";
 const PROD_URL = "https://shrouded-coast-91311.herokuapp.com";
 
-// Un-comment for local development
-const BACKED_URI = DEV_URL;
-const WEBSOCKET_URI = DEV_WEBSOCKET_URI;
-
-// Un-comment to enable Production backend
-// const BACKED_URI = PROD_URL;
-// const WEBSOCKET_URI = PROD_WEBSOCKET_URI;
+// @ts-ignore
+const BACKED_URI = process.env.NODE_ENV === "development" ? DEV_URL : PROD_URL;
+const WEBSOCKET_URI =
+  // @ts-ignore
+  process.env.NODE_ENV === "development"
+    ? DEV_WEBSOCKET_URI
+    : PROD_WEBSOCKET_URI;
 
 /** ******************************************************************************
  * Types

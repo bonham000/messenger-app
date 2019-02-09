@@ -263,17 +263,16 @@ export default class App extends React.Component<{}, IState> {
 
   postMessage = async () => {
     try {
-      const message = {
-        message: this.state.input,
-        author: "Seanie X",
-      };
       const result = await fetch(`${BACKEND_URI}/message`, {
         ...HTTP.POST,
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(message),
+        body: JSON.stringify({
+          message: this.state.input,
+          author: this.state.name,
+        }),
       });
       const newMessage = await result.json();
       this.setState(handleSaveMessage(newMessage), () => {

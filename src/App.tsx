@@ -171,6 +171,9 @@ export default class App extends React.Component<{}, IState> {
     try {
       this.socket.send(data);
     } catch (err) {
+      /**
+       * Any way to avoid this bug?
+       */
       console.log("Could not send websockets message!");
     }
   };
@@ -291,6 +294,9 @@ export default class App extends React.Component<{}, IState> {
   };
 
   initializeWebSocketConnection = () => {
+    /**
+     * TODO: May need to re-initialize on app-foregrounding, and also fetch new messages then?
+     */
     try {
       // @ts-ignore
       this.socket = new WebSocket(WEBSOCKET_URI);

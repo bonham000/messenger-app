@@ -75,15 +75,17 @@ jobs:
 workflows:
   version: 2
   test_pull_requests:
-    filters:
-      branches:
-        ignore: master
     jobs:
-      - test
+      - test:
+          filters:
+            branches:
+              ignore: master
   test_and_publish_update:
-    filters:
-      branches:
-        only: master
     jobs:
-      - test
+      - test:
+          filters:
+            branches:
+              only: master
       - publish
+          requires:
+            - test

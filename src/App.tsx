@@ -18,23 +18,15 @@ import {
  * ===============================================================================
  */
 
-// const NODE = "https://calm-plateau-50109.herokuapp.com/";
-const PROD_WEBSOCKET_URI = "ws://calm-plateau-50109.herokuapp.com/";
-const DEV_WEBSOCKET_URI = "ws://192.168.1.129:9001";
-// const PROD_WEBSOCKET_URI = "wss://shrouded-coast-91311.herokuapp.com";
+const DEV = "development";
 const DEV_URL = "http://192.168.1.129:8000";
-const PROD_URL = "https://shrouded-coast-91311.herokuapp.com";
-// const DEV_WEBSOCKET_URI = "wss://echo.websocket.org/";
-// const DEV_WEBSOCKET_URI = "wss://calm-plateau-50109.herokuapp.com/";
+const DEV_WS_URI = "ws://192.168.1.129:9001";
 
-const BACKEND_URI =
-  // @ts-ignore
-  process.env.NODE_ENV === "developmentz" ? DEV_URL : PROD_URL;
-const WEBSOCKET_URI =
-  // @ts-ignore
-  process.env.NODE_ENV === "developmentz"
-    ? DEV_WEBSOCKET_URI
-    : PROD_WEBSOCKET_URI;
+const PROD_URL = "https://shrouded-coast-91311.herokuapp.com";
+const PROD_WS_URI = "ws://calm-plateau-50109.herokuapp.com/";
+
+const BACKEND_URI = process.env.NODE_ENV === DEV ? DEV_URL : PROD_URL;
+const WEBSOCKET_URI = process.env.NODE_ENV === DEV ? DEV_WS_URI : PROD_WS_URI;
 
 /** ==============================================================================
  * Types
@@ -60,9 +52,11 @@ interface MessageBroadcast {
 }
 
 interface IState {
+  name: string;
   input: string;
   appState: string;
   loading: boolean;
+  nameInput: string;
   editingMessage: boolean;
   editMessageData?: Message;
   messages: ReadonlyArray<Message>;
@@ -92,13 +86,15 @@ export default class App extends React.Component<{}, IState> {
       appState: "",
       loading: true,
       messages: [],
+      name: "",
+      nameInput: "",
       editingMessage: false,
     };
   }
 
   async componentDidMount() {
     /**
-     * Add listener to AppState to detect app foreground/background actions.
+     * Add listener to AppState to detect app foreground/background actions
      */
     AppState.addEventListener("change", this.handleAppStateChange);
 
@@ -114,7 +110,19 @@ export default class App extends React.Component<{}, IState> {
   }
 
   render() {
-    if (this.state.loading) {
+    if (!this.state.name) {
+      return (
+        <View style={styles.namePrompt}>
+          <TextInput
+            placeholder="Who are you?"
+            value={this.state.nameInput}
+            onChangeText={this.setNameInput}
+            style={{ ...styles.textInput, width: "90%" }}
+          />
+          <Button onPress={this.setName} title="Choose a name to chat" />
+        </View>
+      );
+    } else if (this.state.loading) {
       return (
         <View
           style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
@@ -141,11 +149,7 @@ export default class App extends React.Component<{}, IState> {
               return (
                 <TouchableOpacity
                   onPress={this.handleTapMessage(message)}
-                  style={{
-                    width: "90%",
-                    marginTop: 7,
-                    marginBottom: 7,
-                  }}
+                  style={styles.message}
                 >
                   <Text
                     style={{ width: "100%", fontWeight: "bold" }}
@@ -163,8 +167,8 @@ export default class App extends React.Component<{}, IState> {
           <View style={styles.center}>
             <TextInput
               style={styles.textInput}
-              placeholder="Type a new message"
               value={this.state.input}
+              placeholder={`Type a message, ${this.state.name}`}
               onChangeText={(text: string) => this.setState({ input: text })}
             />
             <Button
@@ -178,6 +182,20 @@ export default class App extends React.Component<{}, IState> {
       </KeyboardAvoidingView>
     );
   }
+
+  setNameInput = (nameInput: string) => {
+    this.setState({ nameInput });
+  };
+
+  setName = () => {
+    const { nameInput } = this.state;
+    if (nameInput) {
+      this.setState({
+        name: nameInput,
+        nameInput: "",
+      });
+    }
+  };
 
   handleSocketMessage = (data: string) => {
     const messageBroadcast: MessageBroadcast = JSON.parse(data);
@@ -232,15 +250,10 @@ export default class App extends React.Component<{}, IState> {
     try {
       const result = await fetch(`${BACKEND_URI}/messages`, HTTP.GET);
       const response = await result.json();
-      this.setState(
-        {
-          loading: false,
-          messages: response,
-        },
-        () => {
-          this.chatHistory.scrollToEnd({ animated: true });
-        },
-      );
+      this.setState({
+        loading: false,
+        messages: response,
+      });
     } catch (err) {
       this.handleError("GET", err);
     }
@@ -309,32 +322,34 @@ export default class App extends React.Component<{}, IState> {
   };
 
   handleTapMessage = (message: Message) => () => {
-    Alert.alert(
-      "Options",
-      "You can edit or delete",
-      [
-        {
-          text: "Edit",
-          style: "cancel",
-          onPress: () => {
-            this.setState({
-              editingMessage: true,
-              editMessageData: message,
-              input: message.message,
-            });
+    if (this.state.name === message.author) {
+      Alert.alert(
+        "Options",
+        "You can edit or delete",
+        [
+          {
+            text: "Edit",
+            style: "cancel",
+            onPress: () => {
+              this.setState({
+                editingMessage: true,
+                editMessageData: message,
+                input: message.message,
+              });
+            },
           },
-        },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => this.deleteMessage(message),
-        },
-        {
-          text: "Dismiss",
-        },
-      ],
-      { cancelable: false },
-    );
+          {
+            text: "Delete",
+            style: "destructive",
+            onPress: () => this.deleteMessage(message),
+          },
+          {
+            text: "Dismiss",
+          },
+        ],
+        { cancelable: false },
+      );
+    }
   };
 
   initializeWebSocketConnection = () => {
@@ -441,6 +456,11 @@ const styles = StyleSheet.create({
     paddingBottom: 30,
     paddingHorizontal: 30,
   },
+  namePrompt: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   center: {
     alignItems: "center",
     width: "100%",
@@ -450,6 +470,11 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     fontSize: 18,
     fontWeight: "bold",
+  },
+  message: {
+    width: "90%",
+    marginTop: 7,
+    marginBottom: 7,
   },
   input: {
     marginBottom: 40,
@@ -469,3 +494,14 @@ const styles = StyleSheet.create({
     borderColor: "rgba(50,50,50,0.5)",
   },
 });
+
+const validateMessage = data => {
+  return (
+    data.message &&
+    data.message_type &&
+    data.message.id &&
+    data.message.author &&
+    data.message.message &&
+    data.message.uuid
+  );
+};

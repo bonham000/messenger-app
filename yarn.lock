@@ -664,10 +664,10 @@
     reflect-metadata "^0.1.12"
     tslib "^1.8.1"
 
-"@types/expo@^31.0.9":
-  version "31.0.9"
-  resolved "https://registry.yarnpkg.com/@types/expo/-/expo-31.0.9.tgz#8b5f4328b2f5da57e1268375e307cb14fde4b2db"
-  integrity sha512-9RM9ZpZVrIEKAHFOea4D3F4B/fSSIWS51Sx7A/TJ/aqAP5rcvGZVtZWtdJURv6ovTZTx5vUMoNQl9vztLvdhKA==
+"@types/expo@^32.0.0":
+  version "32.0.0"
+  resolved "https://registry.yarnpkg.com/@types/expo/-/expo-32.0.0.tgz#88ecb4bc2417febd5b26647e766781e180b09e34"
+  integrity sha512-hTHZ/Da/VBjYAvfFw8xfnuO2RFS6vgcLOew/zoM+lGDqszgXSbByS3rFeGJ1sCeGp0rl75bYN6U7CglJfZPINA==
   dependencies:
     "@types/fbemitter" "*"
     "@types/react" "*"

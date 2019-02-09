@@ -1,3 +1,4 @@
+import { Updates } from "expo";
 import React from "react";
 import {
   ActivityIndicator,
@@ -394,7 +395,7 @@ export default class App extends React.Component<{}, IState> {
       this.state.appState.match(/inactive|background/) &&
       nextAppState === "active"
     ) {
-      console.log("App foregrounded...");
+      this.checkForAppUpdate();
     }
 
     this.setState({ appState: nextAppState });
@@ -410,6 +411,39 @@ export default class App extends React.Component<{}, IState> {
     } catch (_) {
       // no-op
     }
+  };
+
+  checkForAppUpdate = async (): Promise<void> => {
+    try {
+      const { isAvailable } = await Updates.checkForUpdateAsync();
+      if (isAvailable) {
+        Alert.alert(
+          "Update Available!",
+          "Confirm to update now",
+          [
+            { text: "Cancel", onPress: () => null, style: "cancel" },
+            { text: "OK", onPress: this.updateApp },
+          ],
+          { cancelable: false },
+        );
+      }
+      // tslint:disable-next-line
+    } catch (err) {}
+  };
+
+  updateApp = () => {
+    try {
+      this.setState(
+        {
+          loading: true,
+        },
+        async () => {
+          await Updates.fetchUpdateAsync();
+          Updates.reloadFromCache();
+        },
+      );
+      // tslint:disable-next-line
+    } catch (err) {}
   };
 }
 

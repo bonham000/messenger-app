@@ -8,6 +8,10 @@
     "noUnusedParameters": true,
     "allowSyntheticDefaultImports": true,
     "types": ["jest"],
-    "outDir": "build"
+    "outDir": "build",
+    "baseUrl": ".",
+    "paths": {
+      "expo": ["node_modules/@types/expo", "node_modules/expo"]
+    }
   }
 }

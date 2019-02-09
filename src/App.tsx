@@ -1,5 +1,4 @@
 import React from "react";
-
 import {
   Alert,
   Button,
@@ -11,9 +10,14 @@ import {
   View,
 } from "react-native";
 
-const DEV_WEBSOCKET_URI = "ws://localhost:3012";
+/** ******************************************************************************
+ * Config
+ * ********************************************************************************
+ */
+
+const DEV_WEBSOCKET_URI = "ws://192.168.1.129:3012";
 const PROD_WEBSOCKET_URI = "ws://shrouded-coast-91311.herokuapp.com:3012";
-const DEV_URL = "http://localhost:8000/";
+const DEV_URL = "http://192.168.1.129:8000/";
 const PROD_URL = "https://shrouded-coast-91311.herokuapp.com";
 
 // Un-comment for local development
@@ -24,11 +28,27 @@ const WEBSOCKET_URI = DEV_WEBSOCKET_URI;
 // const BACKED_URI = PROD_URL;
 // const WEBSOCKET_URI = PROD_WEBSOCKET_URI;
 
+/** ******************************************************************************
+ * Types
+ * ********************************************************************************
+ */
+
 interface Message {
   id: number;
   uuid: string;
   message: string;
   author: string;
+}
+
+enum MessageBroadcastType {
+  NEW = "NEW",
+  EDIT = "EDIT",
+  DELETE = "DELETE",
+}
+
+interface MessageBroadcast {
+  message: Message;
+  message_type: MessageBroadcastType;
 }
 
 interface IState {
@@ -44,6 +64,11 @@ const HTTP = {
   POST: { method: "POST" },
   DELETE: { method: "DELETE" },
 };
+
+/** ******************************************************************************
+ * App
+ * ********************************************************************************
+ */
 
 export default class App extends React.Component<{}, IState> {
   socket: any;
@@ -62,7 +87,9 @@ export default class App extends React.Component<{}, IState> {
     // @ts-ignore
     this.socket = new WebSocket(WEBSOCKET_URI);
 
-    // Open connection
+    /**
+     * Open Socket connection
+     */
     this.socket.addEventListener(
       "open",
       (_: any) => {
@@ -73,11 +100,16 @@ export default class App extends React.Component<{}, IState> {
       },
     );
 
-    // Listen for messages
+    /**
+     * Listen for messages
+     */
     this.socket.addEventListener("message", (event: any) => {
       this.handleSocketMessage(event.data);
     });
 
+    /**
+     * Fetch existing messages
+     */
     this.getMessages();
   }
 
@@ -123,17 +155,49 @@ export default class App extends React.Component<{}, IState> {
     );
   }
 
-  handleSocketMessage = (data: any) => {
-    console.log(`Socket data received: ${JSON.stringify(data)}`);
-    /**
-     * TODO: Add message locally, if it doesn't already exist
-     */
+  handleSocketMessage = (data: string) => {
+    const messageBroadcast: MessageBroadcast = JSON.parse(data);
+
+    const { message, message_type } = messageBroadcast;
+    console.log(`New socket message received, type: ${message_type}`);
+    switch (message_type) {
+      case MessageBroadcastType.NEW: {
+        this.handleSaveMessageUpdate(message);
+        break;
+      }
+      case MessageBroadcastType.EDIT: {
+        this.handleEditMessageUpdate(message);
+        break;
+      }
+      case MessageBroadcastType.DELETE: {
+        this.handleDeleteMessageUpdate(message);
+        break;
+      }
+      default: {
+        console.log(`Unexpected message type received: ${message_type}`);
+      }
+    }
   };
 
-  broadcastMessage = (message: Message) => {
-    const data = JSON.stringify(message);
-    console.log("Broadcasting message... ", data);
+  broadcastMessage = (type: MessageBroadcastType, message: Message) => {
+    const data = JSON.stringify({
+      message,
+      message_type: type,
+    });
+    console.log("Broadcasting message over WebSockets... ", data);
     this.socket.send(data);
+  };
+
+  handleSaveMessageUpdate = (message: Message) => {
+    this.setState(handleSaveMessage(message));
+  };
+
+  handleEditMessageUpdate = (message: Message) => {
+    this.setState(handleEditMessage(message));
+  };
+
+  handleDeleteMessageUpdate = (message: Message) => {
+    this.setState(handleDeleteMessage(message.id));
   };
 
   getMessages = async () => {
@@ -163,15 +227,9 @@ export default class App extends React.Component<{}, IState> {
         body: JSON.stringify(message),
       });
       const newMessage = await result.json();
-      this.setState(
-        prevState => ({
-          input: "",
-          messages: prevState.messages.concat(newMessage),
-        }),
-        () => {
-          this.broadcastMessage(newMessage);
-        },
-      );
+      this.setState(handleSaveMessage(newMessage), () => {
+        this.broadcastMessage(MessageBroadcastType.NEW, newMessage);
+      });
     } catch (err) {
       this.handleError("POST", err);
     }
@@ -192,41 +250,21 @@ export default class App extends React.Component<{}, IState> {
         },
         body: JSON.stringify(message),
       });
-      const response = await result.json();
-      this.setState(
-        prevState => ({
-          input: "",
-          editingMessage: false,
-          editMessageData: undefined,
-          messages: prevState.messages.map(m => {
-            return m.id === response.id ? response : m;
-          }),
-        }),
-        () => {
-          /**
-           * TODO: Handle broadcasting edit update
-           */
-        },
-      );
+      const response: Message = await result.json();
+      this.setState(handleEditMessage(response), () => {
+        this.broadcastMessage(MessageBroadcastType.EDIT, response);
+      });
     } catch (err) {
       this.handleError("PUT", err);
     }
   };
 
-  deleteMessage = async (id: number) => {
+  deleteMessage = async (message: Message) => {
     try {
-      await fetch(`${BACKED_URI}/message/${id}`, HTTP.DELETE);
-      this.setState(
-        prevState => ({
-          input: "",
-          messages: prevState.messages.filter(m => m.id !== id),
-        }),
-        () => {
-          /**
-           * TODO: Handle broadcasting delete update
-           */
-        },
-      );
+      await fetch(`${BACKED_URI}/message/${message.id}`, HTTP.DELETE);
+      this.setState(handleDeleteMessage(message.id), () => {
+        this.broadcastMessage(MessageBroadcastType.DELETE, message);
+      });
     } catch (err) {
       this.handleError("DELETE", err);
     }
@@ -255,7 +293,7 @@ export default class App extends React.Component<{}, IState> {
         {
           text: "Delete",
           style: "destructive",
-          onPress: () => this.deleteMessage(message.id),
+          onPress: () => this.deleteMessage(message),
         },
         {
           text: "Dismiss",
@@ -265,6 +303,40 @@ export default class App extends React.Component<{}, IState> {
     );
   };
 }
+
+/** ******************************************************************************
+ * State Helpers
+ * ********************************************************************************
+ */
+
+const handleSaveMessage = (message: Message) => (prevState: IState) => {
+  const maybeExists = prevState.messages.find(m => m.id === message.id);
+  return {
+    input: "",
+    messages: maybeExists
+      ? prevState.messages
+      : prevState.messages.concat(message),
+  };
+};
+
+const handleEditMessage = (message: Message) => (prevState: IState) => ({
+  input: "",
+  editingMessage: false,
+  editMessageData: undefined,
+  messages: prevState.messages.map(m => {
+    return m.id === message.id ? message : m;
+  }),
+});
+
+const handleDeleteMessage = (id: number) => (prevState: IState) => ({
+  input: "",
+  messages: prevState.messages.filter(m => m.id !== id),
+});
+
+/** ******************************************************************************
+ * Styles
+ * ********************************************************************************
+ */
 
 const styles = StyleSheet.create({
   container: {

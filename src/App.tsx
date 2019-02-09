@@ -494,14 +494,3 @@ const styles = StyleSheet.create({
     borderColor: "rgba(50,50,50,0.5)",
   },
 });
-
-const validateMessage = data => {
-  return (
-    data.message &&
-    data.message_type &&
-    data.message.id &&
-    data.message.author &&
-    data.message.message &&
-    data.message.uuid
-  );
-};

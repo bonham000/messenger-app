@@ -18,10 +18,10 @@ import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view
  * ********************************************************************************
  */
 
-const DEV_WEBSOCKET_URI = "ws://172.16.0.137:3012";
-const PROD_WEBSOCKET_URI = "ws://shrouded-coast-91311.herokuapp.com:3012";
-const DEV_URL = "http://172.16.0.137:8000/";
-const PROD_URL = "https://shrouded-coast-91311.herokuapp.com";
+const PROD_WEBSOCKET_URI = "wss://shrouded-coast-91311.herokuapp.com";
+const DEV_URL = "http://192.168.1.129:8000";
+const PROD_URL = "wss://calm-plateau-50109.herokuapp.com";
+const DEV_WEBSOCKET_URI = "ws://192.168.1.129:3012";
 
 const BACKEND_URI =
   // @ts-ignore
@@ -114,7 +114,7 @@ export default class App extends React.Component<{}, IState> {
         <View
           style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
         >
-          <ActivityIndicator color="blue" size="large" />
+          <ActivityIndicator color="rgb(255,62,54)" size="large" />
         </View>
       );
     }
@@ -166,7 +166,7 @@ export default class App extends React.Component<{}, IState> {
     const messageBroadcast: MessageBroadcast = JSON.parse(data);
 
     const { message, message_type } = messageBroadcast;
-    console.log(`New socket message received, type: ${message_type}`);
+    console.log(`New socket message received ==> ${data}`);
     switch (message_type) {
       case MessageBroadcastType.NEW: {
         this.handleSaveMessageUpdate(message);
@@ -199,6 +199,7 @@ export default class App extends React.Component<{}, IState> {
        * Any way to avoid this bug?
        */
       console.log("Could not send websockets message!");
+      console.log(err);
     }
   };
 
@@ -323,6 +324,8 @@ export default class App extends React.Component<{}, IState> {
      * TODO: May need to re-initialize on app-foregrounding, and also fetch new messages then?
      */
     try {
+      console.log("Initializing socket connection at: ", WEBSOCKET_URI);
+
       // @ts-ignore
       this.socket = new WebSocket(WEBSOCKET_URI);
 

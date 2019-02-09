@@ -5,36 +5,40 @@ import {
   AppState,
   Button,
   FlatList,
+  KeyboardAvoidingView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
-import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 
-/** ******************************************************************************
+/** ==============================================================================
  * Config
- * ********************************************************************************
+ * ===============================================================================
  */
 
-const PROD_WEBSOCKET_URI = "wss://shrouded-coast-91311.herokuapp.com";
+// const NODE = "https://calm-plateau-50109.herokuapp.com/";
+const PROD_WEBSOCKET_URI = "ws://calm-plateau-50109.herokuapp.com/";
+const DEV_WEBSOCKET_URI = "ws://192.168.1.129:9001";
+// const PROD_WEBSOCKET_URI = "wss://shrouded-coast-91311.herokuapp.com";
 const DEV_URL = "http://192.168.1.129:8000";
-const PROD_URL = "wss://calm-plateau-50109.herokuapp.com";
-const DEV_WEBSOCKET_URI = "ws://192.168.1.129:3012";
+const PROD_URL = "https://shrouded-coast-91311.herokuapp.com";
+// const DEV_WEBSOCKET_URI = "wss://echo.websocket.org/";
+// const DEV_WEBSOCKET_URI = "wss://calm-plateau-50109.herokuapp.com/";
 
 const BACKEND_URI =
   // @ts-ignore
-  process.env.NODE_ENV === "development" ? DEV_URL : PROD_URL;
+  process.env.NODE_ENV === "developmentz" ? DEV_URL : PROD_URL;
 const WEBSOCKET_URI =
   // @ts-ignore
-  process.env.NODE_ENV === "development"
+  process.env.NODE_ENV === "developmentz"
     ? DEV_WEBSOCKET_URI
     : PROD_WEBSOCKET_URI;
 
-/** ******************************************************************************
+/** ==============================================================================
  * Types
- * ********************************************************************************
+ * ===============================================================================
  */
 
 interface Message {
@@ -71,13 +75,14 @@ const HTTP = {
   DELETE: { method: "DELETE" },
 };
 
-/** ******************************************************************************
+/** ==============================================================================
  * App
- * ********************************************************************************
+ * ===============================================================================
  */
 
 export default class App extends React.Component<{}, IState> {
   socket: any;
+  chatHistory: any;
 
   constructor(props: {}) {
     super(props);
@@ -120,22 +125,32 @@ export default class App extends React.Component<{}, IState> {
     }
 
     return (
-      <KeyboardAwareScrollView>
-        <View style={styles.container}>
-          <Text style={{ margin: 20, fontSize: 18, fontWeight: "bold" }}>
-            Message History:
-          </Text>
+      <KeyboardAvoidingView style={styles.container} behavior="padding" enabled>
+        <View style={styles.innerContainer}>
+          <View style={styles.center}>
+            <Text style={styles.title}>Rocket Messenger 🚀</Text>
+          </View>
           <FlatList
-            contentContainerStyle={{ width: "100%" }}
+            ref={this.assignChatRef}
+            onLayout={this.scrollChatHistory}
+            onContentSizeChange={this.scrollChatHistory}
             data={this.state.messages.map(m => ({ message: m, key: m.uuid }))}
+            contentContainerStyle={{ width: "100%" }}
             renderItem={({ item }) => {
               const { message } = item;
               return (
                 <TouchableOpacity
                   onPress={this.handleTapMessage(message)}
-                  style={{ width: "100%", marginTop: 7, marginBottom: 7 }}
+                  style={{
+                    width: "90%",
+                    marginTop: 7,
+                    marginBottom: 7,
+                  }}
                 >
-                  <Text style={{ fontWeight: "bold" }} key={item.key}>
+                  <Text
+                    style={{ width: "100%", fontWeight: "bold" }}
+                    key={item.key}
+                  >
                     {message.author}:{" "}
                     <Text style={{ fontWeight: "normal" }} key={item.key}>
                       {message.message}
@@ -145,20 +160,22 @@ export default class App extends React.Component<{}, IState> {
               );
             }}
           />
-          <TextInput
-            style={styles.textInput}
-            placeholder="Type a new message"
-            value={this.state.input}
-            onChangeText={(text: string) => this.setState({ input: text })}
-          />
-          <Button
-            onPress={
-              this.state.editingMessage ? this.editMessage : this.postMessage
-            }
-            title={`${this.state.editingMessage ? "Edit" : "Send"} Message`}
-          />
+          <View style={styles.center}>
+            <TextInput
+              style={styles.textInput}
+              placeholder="Type a new message"
+              value={this.state.input}
+              onChangeText={(text: string) => this.setState({ input: text })}
+            />
+            <Button
+              onPress={
+                this.state.editingMessage ? this.editMessage : this.postMessage
+              }
+              title={`${this.state.editingMessage ? "Edit" : "Send"} Message`}
+            />
+          </View>
         </View>
-      </KeyboardAwareScrollView>
+      </KeyboardAvoidingView>
     );
   }
 
@@ -195,11 +212,7 @@ export default class App extends React.Component<{}, IState> {
     try {
       this.socket.send(data);
     } catch (err) {
-      /**
-       * Any way to avoid this bug?
-       */
-      console.log("Could not send websockets message!");
-      console.log(err);
+      console.log("Error sending websockets message broadcast", err);
     }
   };
 
@@ -219,10 +232,15 @@ export default class App extends React.Component<{}, IState> {
     try {
       const result = await fetch(`${BACKEND_URI}/messages`, HTTP.GET);
       const response = await result.json();
-      this.setState({
-        loading: false,
-        messages: response,
-      });
+      this.setState(
+        {
+          loading: false,
+          messages: response,
+        },
+        () => {
+          this.chatHistory.scrollToEnd({ animated: true });
+        },
+      );
     } catch (err) {
       this.handleError("GET", err);
     }
@@ -363,11 +381,23 @@ export default class App extends React.Component<{}, IState> {
 
     this.setState({ appState: nextAppState });
   };
+
+  assignChatRef = (ref: any) => {
+    this.chatHistory = ref;
+  };
+
+  scrollChatHistory = () => {
+    try {
+      this.chatHistory.scrollToEnd({ animated: true });
+    } catch (_) {
+      // no-op
+    }
+  };
 }
 
-/** ******************************************************************************
+/** ==============================================================================
  * State Helpers
- * ********************************************************************************
+ * ===============================================================================
  */
 
 const handleSaveMessage = (message: Message) => (prevState: IState) => {
@@ -394,34 +424,46 @@ const handleDeleteMessage = (id: number) => (prevState: IState) => ({
   messages: prevState.messages.filter(m => m.id !== id),
 });
 
-/** ******************************************************************************
+/** ==============================================================================
  * Styles
- * ********************************************************************************
+ * ===============================================================================
  */
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     width: "100%",
-    paddingTop: 75,
-    paddingBottom: 45,
     backgroundColor: "#fff",
+  },
+  innerContainer: {
+    flex: 1,
+    paddingTop: 50,
+    paddingBottom: 30,
+    paddingHorizontal: 30,
+  },
+  center: {
     alignItems: "center",
-    justifyContent: "flex-end",
+    width: "100%",
+  },
+  title: {
+    marginTop: 20,
+    marginBottom: 20,
+    fontSize: 18,
+    fontWeight: "bold",
   },
   input: {
     marginBottom: 40,
     paddingLeft: 15,
     height: 40,
     borderRadius: 20,
-    width: "90%",
+    width: "100%",
     backgroundColor: "#FFFFFF",
   },
   textInput: {
-    margin: 12,
+    marginVertical: 15,
     padding: 12,
     height: 40,
-    width: "90%",
+    width: "100%",
     borderWidth: 1,
     fontSize: 14,
     borderColor: "rgba(50,50,50,0.5)",

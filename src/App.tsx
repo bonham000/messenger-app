@@ -1,6 +1,8 @@
 import React from "react";
 import {
+  ActivityIndicator,
   Alert,
+  AppState,
   Button,
   FlatList,
   StyleSheet,
@@ -9,15 +11,16 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 
 /** ******************************************************************************
  * Config
  * ********************************************************************************
  */
 
-const DEV_WEBSOCKET_URI = "ws://192.168.1.129:3012";
+const DEV_WEBSOCKET_URI = "ws://172.16.0.137:3012";
 const PROD_WEBSOCKET_URI = "ws://shrouded-coast-91311.herokuapp.com:3012";
-const DEV_URL = "http://192.168.1.129:8000/";
+const DEV_URL = "http://172.16.0.137:8000/";
 const PROD_URL = "https://shrouded-coast-91311.herokuapp.com";
 
 const BACKEND_URI =
@@ -54,6 +57,8 @@ interface MessageBroadcast {
 
 interface IState {
   input: string;
+  appState: string;
+  loading: boolean;
   editingMessage: boolean;
   editMessageData?: Message;
   messages: ReadonlyArray<Message>;
@@ -79,12 +84,19 @@ export default class App extends React.Component<{}, IState> {
 
     this.state = {
       input: "",
+      appState: "",
+      loading: true,
       messages: [],
       editingMessage: false,
     };
   }
 
   async componentDidMount() {
+    /**
+     * Add listener to AppState to detect app foreground/background actions.
+     */
+    AppState.addEventListener("change", this.handleAppStateChange);
+
     /**
      * Initialize web socket connection
      */
@@ -97,44 +109,56 @@ export default class App extends React.Component<{}, IState> {
   }
 
   render() {
+    if (this.state.loading) {
+      return (
+        <View
+          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+        >
+          <ActivityIndicator color="blue" size="large" />
+        </View>
+      );
+    }
+
     return (
-      <View style={styles.container}>
-        <Text style={{ margin: 20, fontSize: 18, fontWeight: "bold" }}>
-          Message History:
-        </Text>
-        <FlatList
-          contentContainerStyle={{ width: "100%" }}
-          data={this.state.messages.map(m => ({ message: m, key: m.uuid }))}
-          renderItem={({ item }) => {
-            const { message } = item;
-            return (
-              <TouchableOpacity
-                onPress={this.handleTapMessage(message)}
-                style={{ width: "100%", marginTop: 7, marginBottom: 7 }}
-              >
-                <Text style={{ fontWeight: "bold" }} key={item.key}>
-                  {message.author}:{" "}
-                  <Text style={{ fontWeight: "normal" }} key={item.key}>
-                    {message.message}
+      <KeyboardAwareScrollView>
+        <View style={styles.container}>
+          <Text style={{ margin: 20, fontSize: 18, fontWeight: "bold" }}>
+            Message History:
+          </Text>
+          <FlatList
+            contentContainerStyle={{ width: "100%" }}
+            data={this.state.messages.map(m => ({ message: m, key: m.uuid }))}
+            renderItem={({ item }) => {
+              const { message } = item;
+              return (
+                <TouchableOpacity
+                  onPress={this.handleTapMessage(message)}
+                  style={{ width: "100%", marginTop: 7, marginBottom: 7 }}
+                >
+                  <Text style={{ fontWeight: "bold" }} key={item.key}>
+                    {message.author}:{" "}
+                    <Text style={{ fontWeight: "normal" }} key={item.key}>
+                      {message.message}
+                    </Text>
                   </Text>
-                </Text>
-              </TouchableOpacity>
-            );
-          }}
-        />
-        <TextInput
-          style={styles.textInput}
-          placeholder="Type a new message"
-          value={this.state.input}
-          onChangeText={(text: string) => this.setState({ input: text })}
-        />
-        <Button
-          onPress={
-            this.state.editingMessage ? this.editMessage : this.postMessage
-          }
-          title={`${this.state.editingMessage ? "Edit" : "Send"} Message`}
-        />
-      </View>
+                </TouchableOpacity>
+              );
+            }}
+          />
+          <TextInput
+            style={styles.textInput}
+            placeholder="Type a new message"
+            value={this.state.input}
+            onChangeText={(text: string) => this.setState({ input: text })}
+          />
+          <Button
+            onPress={
+              this.state.editingMessage ? this.editMessage : this.postMessage
+            }
+            title={`${this.state.editingMessage ? "Edit" : "Send"} Message`}
+          />
+        </View>
+      </KeyboardAwareScrollView>
     );
   }
 
@@ -195,6 +219,7 @@ export default class App extends React.Component<{}, IState> {
       const result = await fetch(`${BACKEND_URI}/messages`, HTTP.GET);
       const response = await result.json();
       this.setState({
+        loading: false,
         messages: response,
       });
     } catch (err) {
@@ -323,6 +348,17 @@ export default class App extends React.Component<{}, IState> {
     } catch (err) {
       console.log("Error initializing web socket connection", err);
     }
+  };
+
+  handleAppStateChange = (nextAppState: string) => {
+    if (
+      this.state.appState.match(/inactive|background/) &&
+      nextAppState === "active"
+    ) {
+      console.log("App foregrounded...");
+    }
+
+    this.setState({ appState: nextAppState });
   };
 }
 

@@ -25,7 +25,9 @@ const DEV_WS_URI = "ws://192.168.1.129:9001";
 const PROD_URL = "https://shrouded-coast-91311.herokuapp.com";
 const PROD_WS_URI = "ws://calm-plateau-50109.herokuapp.com/";
 
+// @ts-ignore
 const BACKEND_URI = process.env.NODE_ENV === DEV ? DEV_URL : PROD_URL;
+// @ts-ignore
 const WEBSOCKET_URI = process.env.NODE_ENV === DEV ? DEV_WS_URI : PROD_WS_URI;
 
 /** ==============================================================================

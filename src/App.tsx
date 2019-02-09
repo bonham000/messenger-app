@@ -460,8 +460,10 @@ const styles = StyleSheet.create({
   },
   namePrompt: {
     flex: 1,
+    width: "100%",
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "#fff",
   },
   center: {
     alignItems: "center",

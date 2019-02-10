@@ -15,6 +15,8 @@ import {
   View,
 } from "react-native";
 
+import { ShakeEventExpo } from "./ShakeEvent";
+
 /** ==============================================================================
  * Config
  * ===============================================================================
@@ -70,6 +72,7 @@ interface IState {
   nameInput: string;
   loadingName: boolean;
   editingMessage: boolean;
+  editName: boolean;
   editMessageData?: Message;
   requestInProgress: boolean;
   checkingForUpdate: boolean;
@@ -100,6 +103,7 @@ export default class App extends React.Component<{}, IState> {
       input: "",
       appState: "",
       loading: true,
+      editName: false,
       loadingName: true,
       messages: [],
       name: "",
@@ -123,46 +127,59 @@ export default class App extends React.Component<{}, IState> {
     this.maybeRestoreName();
 
     /**
-     * Add listener to AppState to detect app foreground/background actions
-     */
-    AppState.addEventListener("change", this.handleAppStateChange);
-
-    /**
      * Initialize the chat
      */
     this.initializeMessageHistory();
+
+    /**
+     * Add shake listener
+     */
+    ShakeEventExpo.addListener(this.handleShake);
+
+    /**
+     * Add listener to AppState to detect app foreground/background actions
+     */
+    AppState.addEventListener("change", this.handleAppStateChange);
   }
 
-  initializeMessageHistory = async () => {
-    /**
-     * Initialize web socket connection
-     */
-    this.initializeWebSocketConnection();
-
-    /**
-     * Fetch existing messages
-     */
-    this.getMessages();
-  };
+  componentWillUnmount() {
+    this.shutdownSocketConnection();
+    ShakeEventExpo.removeListener();
+  }
 
   render() {
-    if (this.state.loadingName) {
+    const {
+      input,
+      loading,
+      editName,
+      loadingName,
+      messages,
+      name,
+      nameInput,
+      requestInProgress,
+      checkingForUpdate,
+      editingMessage,
+    } = this.state;
+
+    if (loadingName) {
       return (
         <View style={styles.fallback}>
-          <Text style={styles.title}>Choose a name</Text>
+          <Text style={styles.title}>
+            {editName ? "Edit your" : "Choose an"} name
+          </Text>
           <TextInput
             placeholder="Who are you?"
-            value={this.state.nameInput}
+            value={nameInput}
             onChangeText={this.setNameInput}
             style={{ ...styles.textInput, width: "90%" }}
           />
           <Button onPress={this.setName} title="Save" />
         </View>
       );
-    } else if (this.state.loading || this.state.checkingForUpdate) {
+    } else if (loading || checkingForUpdate) {
       return (
         <View style={styles.fallback}>
-          <ActivityIndicator color="rgb(255,62,54)" size="large" />
+          <ActivityIndicator color={ROCKET_RED} size="large" />
         </View>
       );
     }
@@ -176,12 +193,12 @@ export default class App extends React.Component<{}, IState> {
           <FlatList
             ref={this.assignChatRef}
             onLayout={() => {
-              if (this.state.messages.length > 15) {
+              if (messages.length > 15) {
                 this.scrollChatHistory();
               }
             }}
             onContentSizeChange={this.scrollChatHistory}
-            data={this.state.messages.map(m => ({ message: m, key: m.uuid }))}
+            data={messages.map(m => ({ message: m, key: m.uuid }))}
             contentContainerStyle={{ width: "100%" }}
             renderItem={({ item }) => {
               const { message } = item;
@@ -206,18 +223,16 @@ export default class App extends React.Component<{}, IState> {
           <View style={styles.center}>
             <TextInput
               style={styles.textInput}
-              value={this.state.input}
-              placeholder={`Type a message, ${this.state.name}`}
+              value={input}
+              placeholder={`Type a message, ${name}`}
               onChangeText={(text: string) => this.setState({ input: text })}
             />
             <Button
-              onPress={
-                this.state.editingMessage ? this.editMessage : this.postMessage
-              }
+              onPress={editingMessage ? this.editMessage : this.postMessage}
               title={`${
-                this.state.requestInProgress
+                requestInProgress
                   ? "Processing..."
-                  : this.state.editingMessage
+                  : editingMessage
                   ? "Edit"
                   : "Send"
               } Message`}
@@ -227,6 +242,18 @@ export default class App extends React.Component<{}, IState> {
       </KeyboardAvoidingView>
     );
   }
+
+  initializeMessageHistory = async () => {
+    /**
+     * Initialize web socket connection
+     */
+    this.initializeWebSocketConnection();
+
+    /**
+     * Fetch existing messages
+     */
+    this.getMessages();
+  };
 
   setNameInput = (nameInput: string) => {
     this.setState({ nameInput });
@@ -254,6 +281,14 @@ export default class App extends React.Component<{}, IState> {
     }
 
     this.setState({ name, loadingName: !Boolean(name) });
+  };
+
+  handleShake = () => {
+    this.setState(prevState => ({
+      loadingName: true,
+      editName: true,
+      nameInput: prevState.name,
+    }));
   };
 
   handleSocketMessage = (data: string) => {
@@ -446,17 +481,7 @@ export default class App extends React.Component<{}, IState> {
   };
 
   initializeWebSocketConnection = () => {
-    /**
-     * Close any existing connection
-     */
-    if (this.socket) {
-      try {
-        this.socket.close();
-        this.socket = null;
-      } catch (_) {
-        // no-op
-      }
-    }
+    this.shutdownSocketConnection();
 
     try {
       console.log("Initializing socket connection at: ", WEBSOCKET_URI);
@@ -487,6 +512,20 @@ export default class App extends React.Component<{}, IState> {
       });
     } catch (err) {
       console.log("Error initializing web socket connection", err);
+    }
+  };
+
+  shutdownSocketConnection = () => {
+    /**
+     * Close any existing connection
+     */
+    try {
+      if (this.socket) {
+        this.socket.close();
+        this.socket = null;
+      }
+    } catch (_) {
+      // no-op
     }
   };
 
@@ -607,6 +646,8 @@ const now = () => Date.now();
  * Styles
  * ===============================================================================
  */
+
+const ROCKET_RED = "rgb(255,62,54)";
 
 const styles = StyleSheet.create({
   container: {

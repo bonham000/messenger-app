@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Alert,
   AppState,
+  AsyncStorage,
   Button,
   FlatList,
   KeyboardAvoidingView,
@@ -18,6 +19,8 @@ import {
  * Config
  * ===============================================================================
  */
+
+const NAME_KEY = "NAME_KEY";
 
 const DEV = "development";
 const DEV_URL = "http://192.168.1.129:8000";
@@ -97,6 +100,16 @@ export default class App extends React.Component<{}, IState> {
 
   async componentDidMount() {
     /**
+     * Fetch existing messages
+     */
+    this.getMessages();
+
+    /**
+     * Restore user name if it exists
+     */
+    await this.maybeRestoreName();
+
+    /**
      * Add listener to AppState to detect app foreground/background actions
      */
     AppState.addEventListener("change", this.handleAppStateChange);
@@ -105,17 +118,12 @@ export default class App extends React.Component<{}, IState> {
      * Initialize web socket connection
      */
     this.initializeWebSocketConnection();
-
-    /**
-     * Fetch existing messages
-     */
-    this.getMessages();
   }
 
   render() {
     if (!this.state.name) {
       return (
-        <View style={styles.namePrompt}>
+        <View style={styles.fallback}>
           <TextInput
             placeholder="Who are you?"
             value={this.state.nameInput}
@@ -127,9 +135,7 @@ export default class App extends React.Component<{}, IState> {
       );
     } else if (this.state.loading) {
       return (
-        <View
-          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
-        >
+        <View style={styles.fallback}>
           <ActivityIndicator color="rgb(255,62,54)" size="large" />
         </View>
       );
@@ -190,9 +196,10 @@ export default class App extends React.Component<{}, IState> {
     this.setState({ nameInput });
   };
 
-  setName = () => {
+  setName = async () => {
     const { nameInput } = this.state;
     if (nameInput) {
+      await AsyncStorage.setItem(NAME_KEY, JSON.stringify({ name: nameInput }));
       this.setState({
         name: nameInput,
         nameInput: "",
@@ -390,6 +397,18 @@ export default class App extends React.Component<{}, IState> {
     }
   };
 
+  maybeRestoreName = async () => {
+    try {
+      const rawName = (await AsyncStorage.getItem("NAME_KEY")) || "";
+      const name = JSON.parse(rawName);
+      if (name) {
+        this.setState({ name });
+      }
+    } catch (err) {
+      // no-op
+    }
+  };
+
   handleAppStateChange = (nextAppState: string) => {
     if (
       this.state.appState.match(/inactive|background/) &&
@@ -493,7 +512,7 @@ const styles = StyleSheet.create({
     paddingBottom: 30,
     paddingHorizontal: 30,
   },
-  namePrompt: {
+  fallback: {
     flex: 1,
     width: "100%",
     alignItems: "center",

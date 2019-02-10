@@ -33,17 +33,13 @@ const DEV = "development";
 const DEV_URL = "http://192.168.1.129:8000";
 const DEV_WS_URI = "ws://127.0.0.1:3012";
 
-// @ts-ignore
 const PROD_URL = "https://shrouded-coast-91311.herokuapp.com";
-// @ts-ignore
 const PROD_WS_URI = "ws://calm-plateau-50109.herokuapp.com/";
 
-const BACKEND_URI =
-  // @ts-ignore
-  process.env.NODE_ENV === DEV ? DEV_URL : process.env.PROD_URL;
-const WEBSOCKET_URI =
-  // @ts-ignore
-  process.env.NODE_ENV === DEV ? DEV_WS_URI : process.env.PROD_WS_URI;
+// @ts-ignore
+const BACKEND_URI = process.env.NODE_ENV === DEV ? DEV_URL : PROD_URL;
+// @ts-ignore
+const WEBSOCKET_URI = process.env.NODE_ENV === DEV ? DEV_WS_URI : PROD_WS_URI;
 
 /** ==============================================================================
  * Types

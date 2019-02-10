@@ -71,7 +71,7 @@ interface IState {
   loadingName: boolean;
   editingMessage: boolean;
   editMessageData?: Message;
-  sendingMessage: boolean;
+  requestInProgress: boolean;
   checkingForUpdate: boolean;
   messages: ReadonlyArray<Message>;
   backgroundSessionStart: number;
@@ -104,7 +104,7 @@ export default class App extends React.Component<{}, IState> {
       messages: [],
       name: "",
       nameInput: "",
-      sendingMessage: false,
+      requestInProgress: false,
       checkingForUpdate: true,
       editingMessage: false,
       backgroundSessionStart: 0,
@@ -175,7 +175,11 @@ export default class App extends React.Component<{}, IState> {
           </View>
           <FlatList
             ref={this.assignChatRef}
-            onLayout={this.scrollChatHistory}
+            onLayout={() => {
+              if (this.state.messages.length > 15) {
+                this.scrollChatHistory();
+              }
+            }}
             onContentSizeChange={this.scrollChatHistory}
             data={this.state.messages.map(m => ({ message: m, key: m.uuid }))}
             contentContainerStyle={{ width: "100%" }}
@@ -210,7 +214,13 @@ export default class App extends React.Component<{}, IState> {
               onPress={
                 this.state.editingMessage ? this.editMessage : this.postMessage
               }
-              title={`${this.state.editingMessage ? "Edit" : "Send"} Message`}
+              title={`${
+                this.state.requestInProgress
+                  ? "Processing..."
+                  : this.state.editingMessage
+                  ? "Edit"
+                  : "Send"
+              } Message`}
             />
           </View>
         </View>
@@ -317,61 +327,86 @@ export default class App extends React.Component<{}, IState> {
   };
 
   postMessage = async () => {
-    if (this.state.input) {
-      try {
-        const result = await fetch(`${BACKEND_URI}/message`, {
-          ...HTTP.POST,
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            message: this.state.input,
-            author: this.state.name,
-          }),
-        });
-        const newMessage = await result.json();
-        this.setState(handleSaveMessage(newMessage), () => {
-          this.broadcastMessage(MessageBroadcastType.NEW, newMessage);
-        });
-      } catch (err) {
-        this.handleError("POST", err);
-      }
+    if (this.state.input && !this.state.requestInProgress) {
+      this.setState(
+        {
+          requestInProgress: true,
+        },
+        async () => {
+          try {
+            const result = await fetch(`${BACKEND_URI}/message`, {
+              ...HTTP.POST,
+              headers: {
+                Accept: "application/json",
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                message: this.state.input,
+                author: this.state.name,
+              }),
+            });
+            const newMessage = await result.json();
+            this.setState(handleSaveMessage(newMessage), () => {
+              this.broadcastMessage(MessageBroadcastType.NEW, newMessage);
+            });
+          } catch (err) {
+            this.handleError("POST", err);
+          }
+        },
+      );
     }
   };
 
   editMessage = async () => {
-    try {
-      const message = {
-        ...this.state.editMessageData,
-        message: this.state.input,
-        author: "Seanie X",
-      };
-      const result = await fetch(`${BACKEND_URI}/message`, {
-        ...HTTP.PUT,
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
+    if (!this.state.requestInProgress) {
+      this.setState(
+        {
+          requestInProgress: true,
         },
-        body: JSON.stringify(message),
-      });
-      const response: Message = await result.json();
-      this.setState(handleEditMessage(response), () => {
-        this.broadcastMessage(MessageBroadcastType.EDIT, response);
-      });
-    } catch (err) {
-      this.handleError("PUT", err);
+        async () => {
+          try {
+            const message = {
+              ...this.state.editMessageData,
+              message: this.state.input,
+              author: "Seanie X",
+            };
+            const result = await fetch(`${BACKEND_URI}/message`, {
+              ...HTTP.PUT,
+              headers: {
+                Accept: "application/json",
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(message),
+            });
+            const response: Message = await result.json();
+            this.setState(handleEditMessage(response), () => {
+              this.broadcastMessage(MessageBroadcastType.EDIT, response);
+            });
+          } catch (err) {
+            this.handleError("PUT", err);
+          }
+        },
+      );
     }
   };
 
   deleteMessage = async (message: Message) => {
-    try {
-      await fetch(`${BACKEND_URI}/message/${message.id}`, HTTP.DELETE);
-      this.setState(handleDeleteMessage(message.id), () => {
-        this.broadcastMessage(MessageBroadcastType.DELETE, message);
-      });
-    } catch (err) {
-      this.handleError("DELETE", err);
+    if (!this.state.requestInProgress) {
+      this.setState(
+        {
+          requestInProgress: true,
+        },
+        async () => {
+          try {
+            await fetch(`${BACKEND_URI}/message/${message.id}`, HTTP.DELETE);
+            this.setState(handleDeleteMessage(message.id), () => {
+              this.broadcastMessage(MessageBroadcastType.DELETE, message);
+            });
+          } catch (err) {
+            this.handleError("DELETE", err);
+          }
+        },
+      );
     }
   };
 
@@ -380,7 +415,7 @@ export default class App extends React.Component<{}, IState> {
   };
 
   handleTapMessage = (message: Message) => () => {
-    if (this.state.name === message.author) {
+    if (!this.state.requestInProgress && this.state.name === message.author) {
       Alert.alert(
         "Options",
         "You can edit or delete",
@@ -543,6 +578,7 @@ const handleSaveMessage = (message: Message) => (prevState: IState) => {
   const maybeExists = prevState.messages.find(m => m.id === message.id);
   return {
     input: "",
+    requestInProgress: false,
     messages: maybeExists
       ? prevState.messages
       : prevState.messages.concat(message),
@@ -551,6 +587,7 @@ const handleSaveMessage = (message: Message) => (prevState: IState) => {
 
 const handleEditMessage = (message: Message) => (prevState: IState) => ({
   input: "",
+  requestInProgress: false,
   editingMessage: false,
   editMessageData: undefined,
   messages: prevState.messages.map(m => {
@@ -560,6 +597,7 @@ const handleEditMessage = (message: Message) => (prevState: IState) => ({
 
 const handleDeleteMessage = (id: number) => (prevState: IState) => ({
   input: "",
+  requestInProgress: false,
   messages: prevState.messages.filter(m => m.id !== id),
 });
 

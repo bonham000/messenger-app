@@ -22,6 +22,11 @@ import {
 
 const NAME_KEY = "NAME_KEY";
 
+/**
+ * background session timeout is 25 minutes to account for Heroku dynos sleeping
+ */
+const BACKGROUND_TIMEOUT = 25 * 60 * 1000;
+
 const DEV = "development";
 const DEV_URL = "http://192.168.1.129:8000";
 const DEV_WS_URI = "ws://192.168.1.129:9001";
@@ -67,6 +72,7 @@ interface IState {
   editingMessage: boolean;
   editMessageData?: Message;
   messages: ReadonlyArray<Message>;
+  backgroundSessionStart: number;
 }
 
 const HTTP = {
@@ -97,6 +103,7 @@ export default class App extends React.Component<{}, IState> {
       name: "",
       nameInput: "",
       editingMessage: false,
+      backgroundSessionStart: 0,
     };
   }
 
@@ -117,6 +124,13 @@ export default class App extends React.Component<{}, IState> {
     AppState.addEventListener("change", this.handleAppStateChange);
 
     /**
+     * Initialize the chat
+     */
+    this.initializeMessageHistory();
+  }
+
+  initializeMessageHistory = async () => {
+    /**
      * Initialize web socket connection
      */
     this.initializeWebSocketConnection();
@@ -125,19 +139,20 @@ export default class App extends React.Component<{}, IState> {
      * Fetch existing messages
      */
     this.getMessages();
-  }
+  };
 
   render() {
     if (this.state.loadingName) {
       return (
         <View style={styles.fallback}>
+          <Text style={styles.title}>Choose a name</Text>
           <TextInput
             placeholder="Who are you?"
             value={this.state.nameInput}
             onChangeText={this.setNameInput}
             style={{ ...styles.textInput, width: "90%" }}
           />
-          <Button onPress={this.setName} title="Choose a name to chat" />
+          <Button onPress={this.setName} title="Save" />
         </View>
       );
     } else if (this.state.loading) {
@@ -210,8 +225,21 @@ export default class App extends React.Component<{}, IState> {
       this.setState({
         name: nameInput,
         nameInput: "",
+        loadingName: false,
       });
     }
+  };
+
+  maybeRestoreName = async () => {
+    let name = "";
+    try {
+      const rawName = (await AsyncStorage.getItem("NAME_KEY")) || "";
+      name = JSON.parse(rawName).name;
+    } catch (err) {
+      // no-op
+    }
+
+    this.setState({ name, loadingName: !Boolean(name) });
   };
 
   handleSocketMessage = (data: string) => {
@@ -264,16 +292,24 @@ export default class App extends React.Component<{}, IState> {
   };
 
   getMessages = async () => {
-    try {
-      const result = await fetch(`${BACKEND_URI}/messages`, HTTP.GET);
-      const response = await result.json();
-      this.setState({
-        loading: false,
-        messages: response,
-      });
-    } catch (err) {
-      this.handleError("GET", err);
-    }
+    this.setState(
+      {
+        loading: true,
+        messages: [],
+      },
+      async () => {
+        try {
+          const result = await fetch(`${BACKEND_URI}/messages`, HTTP.GET);
+          const response = await result.json();
+          this.setState({
+            loading: false,
+            messages: response,
+          });
+        } catch (err) {
+          this.handleError("GET", err);
+        }
+      },
+    );
   };
 
   postMessage = async () => {
@@ -372,8 +408,17 @@ export default class App extends React.Component<{}, IState> {
 
   initializeWebSocketConnection = () => {
     /**
-     * TODO: May need to re-initialize on app-foregrounding, and also fetch new messages then?
+     * Close any existing connection
      */
+    if (this.socket) {
+      try {
+        this.socket.close();
+        this.socket = null;
+      } catch (_) {
+        // no-op
+      }
+    }
+
     try {
       console.log("Initializing socket connection at: ", WEBSOCKET_URI);
 
@@ -393,6 +438,8 @@ export default class App extends React.Component<{}, IState> {
         },
       );
 
+      this.socket.addEventListener("onclose", () => null);
+
       /**
        * Listen for messages
        */
@@ -404,24 +451,25 @@ export default class App extends React.Component<{}, IState> {
     }
   };
 
-  maybeRestoreName = async () => {
-    let name = "";
-    try {
-      const rawName = (await AsyncStorage.getItem("NAME_KEY")) || "";
-      name = JSON.parse(rawName).name;
-    } catch (err) {
-      // no-op
-    }
-
-    this.setState({ name, loadingName: false });
-  };
-
   handleAppStateChange = (nextAppState: string) => {
     if (
       this.state.appState.match(/inactive|background/) &&
       nextAppState === "active"
     ) {
       this.checkForAppUpdate();
+
+      const time = now();
+      const backgroundTime = time - this.state.backgroundSessionStart;
+      if (backgroundTime > BACKGROUND_TIMEOUT) {
+        /**
+         * Only do this if app has been background for more than 30 minutes
+         */
+        this.initializeMessageHistory();
+      }
+    } else {
+      this.setState({
+        backgroundSessionStart: now(),
+      });
     }
 
     this.setState({ appState: nextAppState });
@@ -501,6 +549,8 @@ const handleDeleteMessage = (id: number) => (prevState: IState) => ({
   input: "",
   messages: prevState.messages.filter(m => m.id !== id),
 });
+
+const now = () => Date.now();
 
 /** ==============================================================================
  * Styles

@@ -322,7 +322,7 @@ export default class App extends React.Component<{}, IState> {
   };
 
   handleSaveMessageUpdate = (message: Message) => {
-    this.setState(handleSaveMessage(message));
+    this.setState(handleSaveMessage(message, false));
   };
 
   handleEditMessageUpdate = (message: Message) => {
@@ -465,7 +465,7 @@ export default class App extends React.Component<{}, IState> {
             onPress: () => this.deleteMessage(message),
           },
           {
-            text: "Dismiss",
+            text: "Cancel",
           },
         ],
         { cancelable: false },
@@ -477,7 +477,9 @@ export default class App extends React.Component<{}, IState> {
     this.shutdownSocketConnection();
 
     try {
-      console.log("Initializing socket connection at: ", WEBSOCKET_URI);
+      console.log(
+        `Trying to initialize socket connection at: ${WEBSOCKET_URI}`,
+      );
 
       // @ts-ignore
       this.socket = new WebSocket(WEBSOCKET_URI);
@@ -606,10 +608,12 @@ export default class App extends React.Component<{}, IState> {
  * ===============================================================================
  */
 
-const handleSaveMessage = (message: Message) => (prevState: IState) => {
+const handleSaveMessage = (message: Message, clearInput: boolean = true) => (
+  prevState: IState,
+) => {
   const maybeExists = prevState.messages.find(m => m.id === message.id);
   return {
-    input: "",
+    input: clearInput ? "" : prevState.input,
     requestInProgress: false,
     messages: maybeExists
       ? prevState.messages

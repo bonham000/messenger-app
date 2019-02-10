@@ -63,6 +63,7 @@ interface IState {
   appState: string;
   loading: boolean;
   nameInput: string;
+  loadingName: boolean;
   editingMessage: boolean;
   editMessageData?: Message;
   messages: ReadonlyArray<Message>;
@@ -91,6 +92,7 @@ export default class App extends React.Component<{}, IState> {
       input: "",
       appState: "",
       loading: true,
+      loadingName: true,
       messages: [],
       name: "",
       nameInput: "",
@@ -100,14 +102,14 @@ export default class App extends React.Component<{}, IState> {
 
   async componentDidMount() {
     /**
-     * Fetch existing messages
+     * Check for any app updates
      */
-    this.getMessages();
+    this.checkForAppUpdate();
 
     /**
      * Restore user name if it exists
      */
-    await this.maybeRestoreName();
+    this.maybeRestoreName();
 
     /**
      * Add listener to AppState to detect app foreground/background actions
@@ -118,10 +120,15 @@ export default class App extends React.Component<{}, IState> {
      * Initialize web socket connection
      */
     this.initializeWebSocketConnection();
+
+    /**
+     * Fetch existing messages
+     */
+    this.getMessages();
   }
 
   render() {
-    if (!this.state.name) {
+    if (this.state.loadingName) {
       return (
         <View style={styles.fallback}>
           <TextInput
@@ -398,15 +405,15 @@ export default class App extends React.Component<{}, IState> {
   };
 
   maybeRestoreName = async () => {
+    let name = "";
     try {
       const rawName = (await AsyncStorage.getItem("NAME_KEY")) || "";
-      const name = JSON.parse(rawName);
-      if (name) {
-        this.setState({ name });
-      }
+      name = JSON.parse(rawName).name;
     } catch (err) {
       // no-op
     }
+
+    this.setState({ name, loadingName: false });
   };
 
   handleAppStateChange = (nextAppState: string) => {

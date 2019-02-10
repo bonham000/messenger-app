@@ -71,6 +71,8 @@ interface IState {
   loadingName: boolean;
   editingMessage: boolean;
   editMessageData?: Message;
+  sendingMessage: boolean;
+  checkingForUpdate: boolean;
   messages: ReadonlyArray<Message>;
   backgroundSessionStart: number;
 }
@@ -102,6 +104,8 @@ export default class App extends React.Component<{}, IState> {
       messages: [],
       name: "",
       nameInput: "",
+      sendingMessage: false,
+      checkingForUpdate: true,
       editingMessage: false,
       backgroundSessionStart: 0,
     };
@@ -155,7 +159,7 @@ export default class App extends React.Component<{}, IState> {
           <Button onPress={this.setName} title="Save" />
         </View>
       );
-    } else if (this.state.loading) {
+    } else if (this.state.loading || this.state.checkingForUpdate) {
       return (
         <View style={styles.fallback}>
           <ActivityIndicator color="rgb(255,62,54)" size="large" />
@@ -495,14 +499,23 @@ export default class App extends React.Component<{}, IState> {
           "Update Available!",
           "Confirm to update now",
           [
-            { text: "Cancel", onPress: () => null, style: "cancel" },
+            {
+              text: "Cancel",
+              onPress: () => {
+                this.setState({ checkingForUpdate: false });
+              },
+              style: "cancel",
+            },
             { text: "OK", onPress: this.updateApp },
           ],
           { cancelable: false },
         );
+      } else {
+        this.setState({ checkingForUpdate: false });
       }
-      // tslint:disable-next-line
-    } catch (err) {}
+    } catch (err) {
+      this.setState({ checkingForUpdate: false });
+    }
   };
 
   updateApp = () => {

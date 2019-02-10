@@ -156,7 +156,6 @@ export default class App extends React.Component<{}, IState> {
       messages,
       name,
       nameInput,
-      requestInProgress,
       checkingForUpdate,
       editingMessage,
     } = this.state;
@@ -229,13 +228,7 @@ export default class App extends React.Component<{}, IState> {
             />
             <Button
               onPress={editingMessage ? this.editMessage : this.postMessage}
-              title={`${
-                requestInProgress
-                  ? "Processing..."
-                  : editingMessage
-                  ? "Edit"
-                  : "Send"
-              } Message`}
+              title={`${editingMessage ? "Edit" : "Send"} Message`}
             />
           </View>
         </View>

@@ -513,8 +513,8 @@ export default class App extends React.Component<{}, IState> {
       /**
        * Listen for messages
        */
-      this.socket.on("event", (event: any) => {
-        this.handleSocketMessage(event.data);
+      this.socket.on("update", (event: string) => {
+        this.handleSocketMessage(event);
       });
     } catch (err) {
       console.log("Error initializing web socket connection", err);

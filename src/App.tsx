@@ -13,9 +13,16 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  YellowBox,
 } from "react-native";
+import io from "socket.io-client";
 
 import { ShakeEventExpo } from "./ShakeEvent";
+
+console.ignoredYellowBox = ["Remote debugger"];
+YellowBox.ignoreWarnings([
+  "Unrecognized WebSocket connection option(s) `agent`, `perMessageDeflate`, `pfx`, `key`, `passphrase`, `cert`, `ca`, `ciphers`, `rejectUnauthorized`. Did you mean to put these under `headers`?",
+]);
 
 /** ==============================================================================
  * Config
@@ -29,9 +36,12 @@ const NAME_KEY = "NAME_KEY";
  */
 const BACKGROUND_TIMEOUT = 25 * 60 * 1000;
 
-const DEV = "development";
+const DEV = "developmentz";
 const DEV_URL = "http://192.168.1.129:8000";
-const DEV_WS_URI = "ws://127.0.0.1:3012";
+// Rocket
+// const DEV_WS_URI = "ws://127.0.0.1:3012";
+// Node-Socket
+const DEV_WS_URI = "ws://127.0.0.1:9001";
 
 const PROD_URL = "https://shrouded-coast-91311.herokuapp.com";
 const PROD_WS_URI = "ws://calm-plateau-50109.herokuapp.com/";
@@ -481,14 +491,13 @@ export default class App extends React.Component<{}, IState> {
         `Trying to initialize socket connection at: ${WEBSOCKET_URI}`,
       );
 
-      // @ts-ignore
-      this.socket = new WebSocket(WEBSOCKET_URI);
+      this.socket = io(WEBSOCKET_URI);
 
       /**
        * Open Socket connection
        */
-      this.socket.addEventListener(
-        "open",
+      this.socket.on(
+        "connect",
         (_: any) => {
           console.log("Socket listener opened");
         },
@@ -497,12 +506,14 @@ export default class App extends React.Component<{}, IState> {
         },
       );
 
-      this.socket.addEventListener("onclose", () => null);
+      this.socket.on("disconnect", () => {
+        console.log("Socket connection closed");
+      });
 
       /**
        * Listen for messages
        */
-      this.socket.addEventListener("message", (event: any) => {
+      this.socket.on("event", (event: any) => {
         this.handleSocketMessage(event.data);
       });
     } catch (err) {
@@ -601,6 +612,14 @@ export default class App extends React.Component<{}, IState> {
       // tslint:disable-next-line
     } catch (err) {}
   };
+
+  // setHeartbeat = () => {
+  //   clearTimeout(this.pingTimeout);
+
+  //   this.pingTimeout = setTimeout(() => {
+  //     this.terminate();
+  //   }, 30000 + 1000);
+  // }
 }
 
 /** ==============================================================================

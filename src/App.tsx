@@ -36,12 +36,12 @@ const NAME_KEY = "NAME_KEY";
  */
 const BACKGROUND_TIMEOUT = 25 * 60 * 1000;
 
-const DEV = "developmentz";
+const DEV = "development";
 const DEV_URL = "http://192.168.1.129:8000";
 // Rocket
-// const DEV_WS_URI = "ws://127.0.0.1:3012";
+const DEV_WS_URI = "ws://127.0.0.1:3012";
 // Node-Socket
-const DEV_WS_URI = "ws://127.0.0.1:9001";
+// const DEV_WS_URI = "ws://127.0.0.1:9001";
 
 const PROD_URL = "https://shrouded-coast-91311.herokuapp.com";
 const PROD_WS_URI = "ws://calm-plateau-50109.herokuapp.com/";
@@ -612,14 +612,6 @@ export default class App extends React.Component<{}, IState> {
       // tslint:disable-next-line
     } catch (err) {}
   };
-
-  // setHeartbeat = () => {
-  //   clearTimeout(this.pingTimeout);
-
-  //   this.pingTimeout = setTimeout(() => {
-  //     this.terminate();
-  //   }, 30000 + 1000);
-  // }
 }
 
 /** ==============================================================================

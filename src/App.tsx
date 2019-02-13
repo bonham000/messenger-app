@@ -174,7 +174,7 @@ export default class App extends React.Component<{}, IState> {
       return (
         <View style={styles.fallback}>
           <Text style={styles.title}>
-            {editName ? "Edit your" : "Choose an"} name
+            {editName ? "Edit your" : "Choose a"} name
           </Text>
           <TextInput
             placeholder="Who are you?"
